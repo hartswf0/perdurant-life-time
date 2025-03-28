@@ -1,0 +1,1855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Perdurant Life – Adaptive Robust Version</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <style>
+    /* Base styles */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      color: #a8c6df;
+      font-family: "IBM Plex Mono", monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow: hidden;
+    }
+    #container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+    }
+    #canvas, #grid-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    #canvas { z-index: 1; }
+    #grid-overlay { z-index: 2; pointer-events: none; }
+    
+    /* Interactive zones */
+    .zone-container {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 20px;
+      z-index: 3;
+    }
+    .zone {
+      width: 80px;
+      height: 80px;
+      border: 2px solid rgba(168, 198, 223, 0.3);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+    }
+    .zone.active {
+      border-color: rgba(168, 198, 223, 1);
+      box-shadow: 0 0 15px rgba(168, 198, 223, 0.5);
+    }
+    .zone-name {
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+    .zone-indicator {
+      width: 50px;
+      height: 50px;
+      border-radius: 5px;
+      opacity: 0.7;
+      transition: all 0.3s ease;
+    }
+    .zone.active .zone-indicator {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+    
+    .controls {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px;
+      border-radius: 12px;
+      max-width: 90%;
+      transition: transform 0.3s ease;
+    }
+    .controls.hidden { transform: translateX(-150%); }
+    
+    /* Sliders grid layout */
+    .sliders-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 15px;
+      margin-top: 15px;
+    }
+    
+    button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      color: #a8c6df;
+      background: rgba(168, 198, 223, 0.1);
+      font-size: 13px;
+      font-family: inherit;
+    }
+    button:hover { background: rgba(168, 198, 223, 0.2); }
+    .mute-button { opacity: 0.6; padding: 6px 12px; }
+    .mute-button.active { opacity: 1; }
+    .slider-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .slider-container span { font-size: 12px; letter-spacing: 1px; }
+    .slider {
+      -webkit-appearance: none;
+      width: 120px;
+      height: 4px;
+      background: rgba(168, 198, 223, 0.1);
+      border-radius: 2px;
+      position: relative;
+      margin: 8px 0;
+    }
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #a8c6df;
+      cursor: pointer;
+      box-shadow: 0 0 5px rgba(168, 198, 223, 0.5);
+    }
+    .slider:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(168, 198, 223, 0.5);
+    }
+    .slider:hover::-webkit-slider-thumb {
+      transform: scale(1.1);
+      box-shadow: 0 0 8px rgba(168, 198, 223, 0.7);
+    }
+    
+    /* Art deco slider scale */
+    .slider-scale {
+      position: relative;
+      width: 120px;
+      height: 16px;
+      display: flex;
+      justify-content: space-between;
+      margin-top: 2px;
+    }
+    .scale-mark {
+      position: relative;
+      width: 1px;
+      height: 6px;
+      background: rgba(168, 198, 223, 0.4);
+    }
+    .scale-mark.major {
+      height: 10px;
+      width: 2px;
+      background: rgba(168, 198, 223, 0.6);
+    }
+    .scale-label {
+      position: absolute;
+      font-size: 8px;
+      color: rgba(168, 198, 223, 0.7);
+      top: 12px;
+      transform: translateX(-50%);
+    }
+    .scale-bracket {
+      position: absolute;
+      width: 100%;
+      height: 16px;
+      top: -16px;
+      left: 0;
+      border: 1px solid rgba(168, 198, 223, 0.3);
+      border-bottom: none;
+      border-radius: 4px 4px 0 0;
+      pointer-events: none;
+    }
+    
+    #message {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      color: #a8c6df;
+      font-family: inherit;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px;
+      border-radius: 8px;
+      z-index: 3;
+    }
+    #video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+    /* Hamburger menu styling */
+    #hamburger-menu {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 4;
+      font-size: 24px;
+      cursor: pointer;
+      color: #a8c6df;
+      user-select: none;
+    }
+    /* Full Screen button styling */
+    #fullScreenBtn {
+      padding: 6px 12px;
+      font-size: 13px;
+      border: none;
+      border-radius: 20px;
+      background: rgba(168,198,223,0.1);
+      color: #a8c6df;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    #fullScreenBtn:hover { background: rgba(168,198,223,0.2); }
+    /* Camera selection dropdown */
+    .camera-selection {
+      margin-top: 10px;
+    }
+    .camera-select {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 20px;
+      background: rgba(168, 198, 223, 0.1);
+      color: #a8c6df;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    
+    /* Control buttons */
+    .control-buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 15px;
+    }
+    
+    .control-btn {
+      background: rgba(20, 25, 30, 0.9);
+      border: 3px solid rgba(168, 198, 223, 0.8);
+      color: #a8c6df;
+      border-radius: 6px;
+      aspect-ratio: 1/1;
+      padding: 8px 4px;
+      font-size: 13px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    }
+    
+    .control-btn:hover {
+      background: rgba(50, 60, 70, 0.9);
+      border-color: rgba(168, 198, 223, 0.9);
+    }
+    
+    .control-btn.active {
+      background: rgba(70, 90, 110, 0.9);
+      border-color: rgba(168, 198, 223, 1);
+      box-shadow: 0 0 15px rgba(168, 198, 223, 0.3);
+    }
+    
+    .control-dot {
+      width: 40px;
+      height: 40px;
+      border-radius: 4px;
+      background-color: rgba(20, 25, 30, 0.9);
+      margin-bottom: 8px;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.5) inset;
+      position: relative;
+      overflow: hidden;
+      border: 2px solid rgba(168, 198, 223, 0.8);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 2px;
+    }
+    
+    /* Dot block styling */
+    .dot-block {
+      width: 100%;
+      height: 3.5px;
+      margin-bottom: 0.5px;
+      background-color: #a8c6df;
+      opacity: 0.15;
+      transition: opacity 0.2s ease, transform 0.1s ease;
+    }
+    .dot-block.active {
+      opacity: 1;
+      box-shadow: 0 0 5px rgba(168, 198, 223, 0.7);
+      transform: scaleX(0.95);
+    }
+    
+    /* Chunky display panel */
+    .display-panel {
+      background: rgba(20, 30, 40, 0.9);
+      border: 3px solid rgba(168, 198, 223, 0.8);
+      border-radius: 8px;
+      padding: 15px;
+      margin: 10px 0;
+      min-height: 100px;
+      font-family: 'Courier New', monospace;
+      color: #a8c6df;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    }
+    
+    .parameter-display {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    
+    .parameter-title {
+      font-size: 18px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      text-align: center;
+      text-shadow: 0 0 10px rgba(168, 198, 223, 0.5);
+    }
+    
+    /* Chunky pixel-grid slider */
+    .parameter-slider {
+      width: 100%;
+      height: 30px;
+      background: rgba(20, 25, 30, 0.9);
+      border: 3px solid rgba(168, 198, 223, 0.6);
+      border-radius: 4px;
+      position: relative;
+      margin: 10px 0;
+      cursor: pointer;
+      overflow: hidden;
+    }
+    
+    .parameter-slider-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(to right, 
+        rgba(168, 198, 223, 0.6), 
+        rgba(168, 198, 223, 0.8)
+      );
+      box-shadow: 0 0 15px rgba(168, 198, 223, 0.4) inset;
+      transition: width 0.2s ease;
+    }
+    
+    /* Pixel grid overlay for slider */
+    .parameter-slider::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+      background-size: 6px 6px;
+      pointer-events: none;
+    }
+    
+    .parameter-value {
+      font-size: 22px;
+      text-align: center;
+      font-weight: bold;
+      text-shadow: 0 0 10px rgba(168, 198, 223, 0.5);
+    }
+    
+    /* Make the interface responsive */
+    @media (max-width: 768px) {
+      .controls {
+        max-width: 100%;
+        padding: 10px;
+      }
+      
+      .control-buttons {
+        gap: 5px;
+      }
+      
+      .control-btn {
+        font-size: 11px;
+      }
+      
+      .control-dot {
+        width: 14px;
+        height: 14px;
+        margin-bottom: 4px;
+      }
+      
+      .voice-toggles {
+        gap: 5px;
+      }
+      
+      .display-panel {
+        padding: 8px;
+        min-height: 60px;
+      }
+      
+      .lcd-grid {
+        gap: 1px;
+      }
+    }
+    
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+      .controls {
+        width: 100%;
+        padding: 10px;
+      }
+      
+      .control-buttons {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 5px;
+      }
+      
+      .control-btn {
+        font-size: 11px;
+      }
+      
+      .control-dot {
+        width: 30px;
+        height: 30px;
+      }
+      
+      .dot-block {
+        height: 2.5px;
+      }
+      
+      .parameter-title {
+        font-size: 16px;
+      }
+      
+      .parameter-value {
+        font-size: 18px;
+      }
+    }
+    
+    /* Voice buttons styling to match reference image */
+    .voice-toggles {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 15px;
+      justify-content: space-between;
+    }
+    
+    .mute-button {
+      flex: 1;
+      aspect-ratio: 1/1;
+      max-width: 80px;
+      background: rgba(20, 30, 40, 0.9);
+      border: 2px solid rgba(168, 198, 223, 0.8);
+      border-radius: 6px;
+      color: #a8c6df;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      padding: 5px 0;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    }
+    
+    .mute-button::after {
+      content: "";
+      position: absolute;
+      bottom: 30px;
+      left: 10%;
+      right: 10%;
+      bottom: 10px;
+      background: rgba(168, 198, 223, 0.25);
+      border-radius: 3px;
+      z-index: 0;
+    }
+    
+    .mute-button.active::after {
+      background: rgba(168, 198, 223, 0.5);
+      box-shadow: 0 0 15px rgba(168, 198, 223, 0.4) inset;
+    }
+  </style>
+</head>
+<body>
+  <!-- Hamburger menu to toggle controls -->
+  <div id="hamburger-menu">&#9776;</div>
+  <div id="container">
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+    <canvas id="grid-overlay"></canvas>
+    
+    <!-- Interactive zones for each voice -->
+    <div class="zone-container">
+      <div class="zone active" data-voice="Harmonic">
+        <div class="zone-name">Harmonic</div>
+        <div class="zone-indicator" style="background-color: #a8c6df;"></div>
+      </div>
+      <div class="zone active" data-voice="Crystal">
+        <div class="zone-name">Crystal</div>
+        <div class="zone-indicator" style="background-color: #8eb1d3;"></div>
+      </div>
+      <div class="zone active" data-voice="Deep">
+        <div class="zone-name">Deep</div>
+        <div class="zone-indicator" style="background-color: #749bc7;"></div>
+      </div>
+      <div class="zone active" data-voice="Flow">
+        <div class="zone-name">Flow</div>
+        <div class="zone-indicator" style="background-color: #5a85bb;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="message"></div>
+
+  <div id="hidden-sliders" style="display: none;">
+    <!-- Original sliders stored here but hidden -->
+    <input type="range" min="0" max="100" value="20" class="slider" id="masterGainSlider">
+    <input type="range" min="10" max="60" value="35" class="slider" id="baseVolumeSlider">
+    <input type="range" min="-12" max="12" value="0" class="slider" id="globalTransposeSlider">
+    <input type="range" min="0.5" max="3" step="0.1" value="2.0" class="slider" id="dampingSlider">
+    <input type="range" min="10" max="50" value="25" class="slider" id="sensitivitySlider">
+    <input type="range" min="0" max="100" value="80" class="slider" id="resonanceSlider">
+    <input type="range" min="0.5" max="2" step="0.1" value="0.8" class="slider" id="timingDelaySlider">
+    <input type="range" min="0" max="50" value="0" class="slider" id="noiseFloorSlider">
+    <input type="range" min="0" max="100" value="15" class="slider" id="echoSlider">
+    <input type="range" min="1" max="10" value="5" class="slider" id="maxTonesSlider">
+    <input type="range" min="0.3" max="1.0" step="0.05" value="1" class="slider" id="maxEnergySlider">
+    <input type="range" min="1" max="50" value="5" class="slider" id="scanWidthSlider">
+    <input type="range" min="1" max="20" value="1" class="slider" id="scanSpeedSlider">
+    <input type="range" min="0" max="8" value="2" class="slider" id="survivalMinSlider">
+    <input type="range" min="0" max="8" value="3" class="slider" id="survivalMaxSlider">
+    <input type="range" min="0" max="8" value="3" class="slider" id="birthCountSlider">
+  </div>
+
+  <div id="controls" class="controls">
+    <!-- Top action buttons -->
+    <div class="top-controls">
+      <button id="playBtn" class="action-btn">▶ Begin</button>
+      <button id="clearBtn" class="action-btn">Reset</button>
+      <button id="fullScreenBtn" class="action-btn">Expand</button>
+    </div>
+    
+    <!-- Camera and scan controls -->
+    <div class="camera-scan-controls">
+      <div class="camera-selection">
+        <select id="cameraSelect" class="camera-select">
+          <option value="">Select Eye</option>
+        </select>
+      </div>
+      <div class="scan-toggle">
+        <input type="checkbox" id="scanModeCheckbox">
+        <label for="scanModeCheckbox">Scan</label>
+      </div>
+    </div>
+    
+    <!-- Voice toggle buttons -->
+    <div class="voice-toggles">
+      <button class="mute-button active" data-voice="Harmonic">Harmonic</button>
+      <button class="mute-button active" data-voice="Crystal">Crystal</button>
+      <button class="mute-button active" data-voice="Deep">Deep</button>
+      <button class="mute-button active" data-voice="Flow">Flow</button>
+    </div>
+    
+    <!-- LCD-style display panel -->
+    <div id="display-panel" class="display-panel">
+      <!-- Display will be populated by JavaScript -->
+    </div>
+    
+    <!-- Control buttons grid -->
+    <div class="control-buttons">
+      <div class="control-btn" data-control="gain">
+        <div class="control-dot"></div>
+        <div>Membrane</div>
+      </div>
+      <div class="control-btn" data-control="volume">
+        <div class="control-dot"></div>
+        <div>Dimension</div>
+      </div>
+      <div class="control-btn" data-control="transpose">
+        <div class="control-dot"></div>
+        <div>Scaffold</div>
+      </div>
+      <div class="control-btn" data-control="damping">
+        <div class="control-dot"></div>
+        <div>Suspension</div>
+      </div>
+      
+      <div class="control-btn" data-control="sensitivity">
+        <div class="control-dot"></div>
+        <div>Threshold</div>
+      </div>
+      <div class="control-btn" data-control="resonance">
+        <div class="control-dot"></div>
+        <div>Harmony</div>
+      </div>
+      <div class="control-btn" data-control="timing">
+        <div class="control-dot"></div>
+        <div>Pause</div>
+      </div>
+      <div class="control-btn" data-control="noise">
+        <div class="control-dot"></div>
+        <div>Fracture</div>
+      </div>
+      
+      <div class="control-btn" data-control="echo">
+        <div class="control-dot"></div>
+        <div>Bridge</div>
+      </div>
+      <div class="control-btn" data-control="maxTones">
+        <div class="control-dot"></div>
+        <div>Voices</div>
+      </div>
+      <div class="control-btn" data-control="energy">
+        <div class="control-dot"></div>
+        <div>Force</div>
+      </div>
+      <div class="control-btn" data-control="scanSet">
+        <div class="control-dot"></div>
+        <div>Field</div>
+      </div>
+      
+      <div class="control-btn" data-control="survMin">
+        <div class="control-dot"></div>
+        <div>Minimum</div>
+      </div>
+      <div class="control-btn" data-control="survMax">
+        <div class="control-dot"></div>
+        <div>Maximum</div>
+      </div>
+      <div class="control-btn" data-control="birth">
+        <div class="control-dot"></div>
+        <div>Genesis</div>
+      </div>
+      <div class="control-btn" data-control="about">
+        <div class="control-dot"></div>
+        <div>Prison</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Ensure everything initializes properly when the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+      initializeCamera();
+      setupControlButtons();
+    });
+
+    // Setup control buttons to show parameter values in LCD display
+    function setupControlButtons() {
+      // Store all the original sliders in a hidden container
+      window.sliderDefinitions = {
+        gain: {
+          title: "MEMBRANE",
+          sliderId: "masterGainSlider",
+          min: 0,
+          max: 100,
+          value: 20,
+          unit: "%",
+          step: 1
+        },
+        volume: {
+          title: "DIMENSION",
+          sliderId: "baseVolumeSlider",
+          min: 10,
+          max: 60,
+          value: 35,
+          unit: "dB",
+          step: 1
+        },
+        transpose: {
+          title: "SCAFFOLD",
+          sliderId: "globalTransposeSlider",
+          min: -12,
+          max: 12,
+          value: 0,
+          unit: "st",
+          step: 1
+        },
+        damping: {
+          title: "SUSPENSION",
+          sliderId: "dampingSlider",
+          min: 0.5,
+          max: 3,
+          value: 2.0,
+          unit: "sec",
+          step: 0.1
+        },
+        sensitivity: {
+          title: "THRESHOLD",
+          sliderId: "sensitivitySlider",
+          min: 10,
+          max: 50,
+          value: 25,
+          unit: "",
+          step: 1
+        },
+        resonance: {
+          title: "HARMONY",
+          sliderId: "resonanceSlider",
+          min: 0,
+          max: 100,
+          value: 80,
+          unit: "%",
+          step: 1
+        },
+        timing: {
+          title: "PAUSE",
+          sliderId: "timingDelaySlider",
+          min: 0.5,
+          max: 2,
+          value: 0.8,
+          unit: "sec",
+          step: 0.1
+        },
+        noise: {
+          title: "FRACTURE",
+          sliderId: "noiseFloorSlider",
+          min: 0,
+          max: 50,
+          value: 0,
+          unit: "",
+          step: 1
+        },
+        echo: {
+          title: "BRIDGE",
+          sliderId: "echoSlider",
+          min: 0,
+          max: 100,
+          value: 15,
+          unit: "%",
+          step: 1
+        },
+        maxTones: {
+          title: "VOICES",
+          sliderId: "maxTonesSlider",
+          min: 1,
+          max: 10,
+          value: 5,
+          unit: "",
+          step: 1
+        },
+        energy: {
+          title: "FORCE",
+          sliderId: "maxEnergySlider",
+          min: 0.3,
+          max: 1.0,
+          value: 1,
+          unit: "",
+          step: 0.05
+        },
+        scanSet: {
+          title: "FIELD",
+          isComposite: true,
+          sliders: [
+            {
+              title: "WIDTH",
+              sliderId: "scanWidthSlider",
+              min: 1,
+              max: 50,
+              value: 5,
+              unit: "px",
+              step: 1
+            },
+            {
+              title: "VELOCITY",
+              sliderId: "scanSpeedSlider",
+              min: 1,
+              max: 20,
+              value: 1,
+              unit: "px",
+              step: 1
+            }
+          ]
+        },
+        survMin: {
+          title: "MINIMUM",
+          sliderId: "survivalMinSlider",
+          min: 0,
+          max: 8,
+          value: 2,
+          unit: "",
+          step: 1
+        },
+        survMax: {
+          title: "MAXIMUM",
+          sliderId: "survivalMaxSlider",
+          min: 0,
+          max: 8,
+          value: 3,
+          unit: "",
+          step: 1
+        },
+        birth: {
+          title: "GENESIS",
+          sliderId: "birthCountSlider",
+          min: 0,
+          max: 8,
+          value: 3,
+          unit: "",
+          step: 1
+        },
+        about: {
+          title: "PRISON",
+          isAbout: true
+        }
+      };
+      
+      // Function to initialize dot levels for all controls
+      function initializeDotLevels() {
+        Object.keys(window.sliderDefinitions).forEach(controlType => {
+          const sliderDef = window.sliderDefinitions[controlType];
+          const button = document.querySelector(`.control-btn[data-control="${controlType}"]`);
+          
+          if (button && !sliderDef.isAbout) {
+            const dot = button.querySelector('.control-dot');
+            
+            if (dot) {
+              if (sliderDef.isComposite) {
+                const originalSlider = document.getElementById(sliderDef.sliders[0].sliderId);
+                if (originalSlider) {
+                  updateDotLevel(dot, parseFloat(originalSlider.value), parseFloat(sliderDef.sliders[0].min), parseFloat(sliderDef.sliders[0].max));
+                }
+              } else {
+                const originalSlider = document.getElementById(sliderDef.sliderId);
+                if (originalSlider) {
+                  updateDotLevel(dot, parseFloat(originalSlider.value), parseFloat(sliderDef.min), parseFloat(sliderDef.max));
+                }
+              }
+            }
+          }
+        });
+      }
+      
+      // Initialize dot levels for all control buttons
+      initializeDotLevels();
+      
+      // Add click event to all control buttons
+      document.querySelectorAll('.control-btn').forEach(button => {
+        button.addEventListener('click', function() {
+          const controlType = this.dataset.control;
+          
+          // Remove active class from all buttons
+          document.querySelectorAll('.control-btn').forEach(btn => {
+            btn.classList.remove('active');
+          });
+          
+          // Add active class to clicked button
+          this.classList.add('active');
+          
+          // Get slider definition
+          const sliderDef = window.sliderDefinitions[controlType];
+          
+          if (sliderDef) {
+            // Update display panel
+            updateDisplayPanel(sliderDef);
+            
+            // Add interactive slider if not about
+            if (!sliderDef.isAbout) {
+              if (sliderDef.isComposite) {
+                // For composite sliders, just use the first one for now
+                const originalSlider = document.getElementById(sliderDef.sliders[0].sliderId);
+                if (originalSlider) {
+                  makeSliderInteractive(sliderDef.sliders[0], originalSlider);
+                }
+              } else {
+                const originalSlider = document.getElementById(sliderDef.sliderId);
+                if (originalSlider) {
+                  makeSliderInteractive(sliderDef, originalSlider);
+                }
+              }
+            }
+          }
+        });
+      });
+      
+      // Function to update display panel
+      function updateDisplayPanel(sliderDef) {
+        const displayPanel = document.getElementById('display-panel');
+        displayPanel.innerHTML = '';
+        
+        // Create parameter value display
+        const parameterDisplay = document.createElement('div');
+        parameterDisplay.className = 'parameter-display';
+        
+        const parameterTitle = document.createElement('div');
+        parameterTitle.className = 'parameter-title';
+        parameterTitle.textContent = sliderDef.title;
+        
+        const parameterSlider = document.createElement('div');
+        parameterSlider.className = 'parameter-slider';
+        parameterSlider.id = 'parameter-slider';
+        
+        const parameterSliderFill = document.createElement('div');
+        parameterSliderFill.className = 'parameter-slider-fill';
+        parameterSliderFill.id = 'parameter-slider-fill';
+        
+        parameterSlider.appendChild(parameterSliderFill);
+        
+        const parameterValue = document.createElement('div');
+        parameterValue.className = 'parameter-value';
+        parameterValue.id = 'parameter-value';
+        
+        let value, min, max;
+        
+        if (!sliderDef.isAbout) {
+          if (sliderDef.isComposite) {
+            const originalSlider = document.getElementById(sliderDef.sliders[0].sliderId);
+            if (originalSlider) {
+              value = originalSlider.value;
+              min = sliderDef.sliders[0].min;
+              max = sliderDef.sliders[0].max;
+              parameterValue.textContent = value + (sliderDef.sliders[0].unit ? ' ' + sliderDef.sliders[0].unit : '');
+              updateSliderFill(parameterSliderFill, parseFloat(value), parseFloat(min), parseFloat(max));
+            } else {
+              value = sliderDef.sliders[0].value;
+              min = sliderDef.sliders[0].min;
+              max = sliderDef.sliders[0].max;
+              parameterValue.textContent = value + (sliderDef.sliders[0].unit ? ' ' + sliderDef.sliders[0].unit : '');
+              updateSliderFill(parameterSliderFill, parseFloat(value), parseFloat(min), parseFloat(max));
+            }
+          } else {
+            const originalSlider = document.getElementById(sliderDef.sliderId);
+            if (originalSlider) {
+              value = originalSlider.value;
+              min = sliderDef.min;
+              max = sliderDef.max;
+              parameterValue.textContent = value + (sliderDef.unit ? ' ' + sliderDef.unit : '');
+              updateSliderFill(parameterSliderFill, parseFloat(value), parseFloat(min), parseFloat(max));
+            } else {
+              value = sliderDef.value;
+              min = sliderDef.min;
+              max = sliderDef.max;
+              parameterValue.textContent = value + (sliderDef.unit ? ' ' + sliderDef.unit : '');
+              updateSliderFill(parameterSliderFill, parseFloat(value), parseFloat(min), parseFloat(max));
+            }
+          }
+        } else {
+          parameterValue.textContent = "INFO";
+        }
+        
+        parameterDisplay.appendChild(parameterTitle);
+        parameterDisplay.appendChild(parameterSlider);
+        parameterDisplay.appendChild(parameterValue);
+        displayPanel.appendChild(parameterDisplay);
+      }
+      
+      // Function to make the slider interactive
+      function makeSliderInteractive(sliderDef, originalSlider) {
+        const parameterSlider = document.getElementById('parameter-slider');
+        const parameterValue = document.getElementById('parameter-value');
+        const sliderFill = document.getElementById('parameter-slider-fill');
+        const button = document.querySelector(`.control-btn[data-control="${sliderDef.sliderId.replace('Slider', '').toLowerCase()}"]`);
+        const dot = button ? button.querySelector('.control-dot') : null;
+        
+        if (parameterSlider && parameterValue && sliderFill) {
+          // Add visual feedback on hover
+          parameterSlider.addEventListener('mouseover', function() {
+            this.style.borderColor = 'rgba(168, 198, 223, 1)';
+            this.style.boxShadow = '0 0 15px rgba(168, 198, 223, 0.4)';
+          });
+          
+          parameterSlider.addEventListener('mouseout', function() {
+            this.style.borderColor = 'rgba(168, 198, 223, 0.6)';
+            this.style.boxShadow = 'none';
+          });
+          
+          // Handle click and drag
+          let isDragging = false;
+          
+          parameterSlider.addEventListener('mousedown', function(e) {
+            isDragging = true;
+            updateSliderValue(e);
+            
+            // Visual feedback - click effect
+            this.style.transform = 'scale(0.98)';
+            setTimeout(() => {
+              this.style.transform = 'scale(1)';
+            }, 100);
+          });
+          
+          document.addEventListener('mousemove', function(e) {
+            if (isDragging) {
+              updateSliderValue(e);
+            }
+          });
+          
+          document.addEventListener('mouseup', function() {
+            isDragging = false;
+          });
+          
+          // Touch support for mobile
+          parameterSlider.addEventListener('touchstart', function(e) {
+            isDragging = true;
+            updateSliderValue(e.touches[0]);
+            e.preventDefault();
+            
+            // Visual feedback - touch effect
+            this.style.transform = 'scale(0.98)';
+            setTimeout(() => {
+              this.style.transform = 'scale(1)';
+            }, 100);
+          });
+          
+          document.addEventListener('touchmove', function(e) {
+            if (isDragging) {
+              updateSliderValue(e.touches[0]);
+              e.preventDefault();
+            }
+          });
+          
+          document.addEventListener('touchend', function() {
+            isDragging = false;
+          });
+          
+          function updateSliderValue(e) {
+            // Calculate the new value based on click/touch position
+            const rect = parameterSlider.getBoundingClientRect();
+            let clickPosition = e.clientX - rect.left;
+            
+            // Clamp position to slider bounds
+            clickPosition = Math.max(0, Math.min(rect.width, clickPosition));
+            
+            const percentage = clickPosition / rect.width;
+            
+            // Calculate the new value
+            const range = parseFloat(sliderDef.max) - parseFloat(sliderDef.min);
+            let newValue = parseFloat(sliderDef.min) + (range * percentage);
+            
+            // Round to step
+            const step = parseFloat(sliderDef.step);
+            newValue = Math.round(newValue / step) * step;
+            
+            // Clamp to min/max
+            newValue = Math.max(parseFloat(sliderDef.min), Math.min(parseFloat(sliderDef.max), newValue));
+            
+            // Update original slider
+            originalSlider.value = newValue;
+            
+            // Trigger change event on original slider
+            const event = new Event('input');
+            originalSlider.dispatchEvent(event);
+            
+            // Update display with pixel-snapping effect
+            const snappedPercentage = Math.round(percentage * 25) / 25; // Snap to 4% increments for pixel feel
+            const displayValue = Math.round(newValue * 100) / 100; // Round to 2 decimal places
+            
+            parameterValue.textContent = displayValue + (sliderDef.unit ? ' ' + sliderDef.unit : '');
+            updateSliderFill(sliderFill, newValue, parseFloat(sliderDef.min), parseFloat(sliderDef.max));
+            
+            // Add visual feedback - pulse effect
+            sliderFill.style.boxShadow = '0 0 20px rgba(168, 198, 223, 0.6) inset';
+            setTimeout(() => {
+              sliderFill.style.boxShadow = '0 0 15px rgba(168, 198, 223, 0.4) inset';
+            }, 150);
+            
+            // Update dot level
+            if (dot) {
+              updateDotLevel(dot, newValue, parseFloat(sliderDef.min), parseFloat(sliderDef.max));
+            }
+          }
+        }
+      }
+      
+      // Function to update slider fill
+      function updateSliderFill(sliderFill, value, min, max) {
+        if (sliderFill) {
+          const range = max - min;
+          const percentage = ((value - min) / range) * 100;
+          // Snap to 4px grid for pixel feel
+          const snappedPercentage = Math.round(percentage * 25) / 25;
+          sliderFill.style.width = `${snappedPercentage}%`;
+        }
+      }
+      
+      // Function to update dot level
+      function updateDotLevel(dot, value, min, max) {
+        if (dot) {
+          // Clear previous content
+          dot.innerHTML = '';
+          
+          const range = max - min;
+          const percentage = ((value - min) / range) * 100;
+          
+          // Create 10 bars to represent the level (0-100%)
+          const totalBars = 10;
+          const fillBars = Math.ceil(percentage / 10); // Round up for better visual feedback
+          
+          // Create bars from bottom to top
+          for (let i = 0; i < totalBars; i++) {
+            const barIndex = totalBars - i - 1; // Reverse index (9 down to 0)
+            const isActive = barIndex < fillBars;
+            
+            const bar = document.createElement('div');
+            bar.className = `dot-block ${isActive ? 'active' : ''}`;
+            dot.appendChild(bar);
+          }
+        }
+      }
+    }
+    // Ensure everything initializes properly when the page loads
+    window.addEventListener('load', function() {
+      console.log("Window load event fired");
+      resizeCanvases();
+      
+      // Initialize control buttons and display
+      setupControlButtons();
+      
+      // Set initial display to show the first control (gain/membrane)
+      const firstControl = document.querySelector('.control-btn[data-control="gain"]');
+      if (firstControl) {
+        firstControl.click();
+      }
+      
+      // Force update all dot displays after a slight delay to ensure DOM is ready
+      setTimeout(function() {
+        document.querySelectorAll('.control-btn').forEach(button => {
+          const controlType = button.dataset.control;
+          const sliderDef = window.sliderDefinitions ? window.sliderDefinitions[controlType] : null;
+          
+          if (sliderDef && !sliderDef.isAbout) {
+            const dot = button.querySelector('.control-dot');
+            
+            if (dot) {
+              if (sliderDef.isComposite) {
+                const originalSlider = document.getElementById(sliderDef.sliders[0].sliderId);
+                if (originalSlider) {
+                  updateDotLevel(dot, parseFloat(originalSlider.value), parseFloat(sliderDef.sliders[0].min), parseFloat(sliderDef.sliders[0].max));
+                }
+              } else {
+                const originalSlider = document.getElementById(sliderDef.sliderId);
+                if (originalSlider) {
+                  updateDotLevel(dot, parseFloat(originalSlider.value), parseFloat(sliderDef.min), parseFloat(sliderDef.max));
+                }
+              }
+            }
+          }
+        });
+      }, 100);
+      
+      // Ensure frame processing starts if it hasn't already
+      if (!frameProcessingStarted) {
+        requestAnimationFrame(processFrame);
+      }
+    });
+    
+    // ----- Unified Platform Detection & Settings -----
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    const sensitivityMultiplier = 1;
+    
+    // Flag to track if frame processing has started
+    let frameProcessingStarted = false;
+
+    // ----- Global Constants & Variables -----
+    const GRID_SIZE = 16;
+    const CELL_COOLDOWN = 500; // ms per cell trigger
+    let grid = Array.from({ length: GRID_SIZE }, () =>
+      Array.from({ length: GRID_SIZE }, () => ({ voices: new Set(), energy: 0, lastTriggered: 0 }))
+    );
+    let isPlaying = false;
+    let evolutionInterval;
+    let ambientBaseline = 0;
+    let maxTonesPerFrame = parseInt(document.getElementById("maxTonesSlider").value);
+    let timingDelay = parseFloat(document.getElementById("timingDelaySlider").value);
+    let maxEnergy = parseFloat(document.getElementById("maxEnergySlider").value);
+
+    // New global variables for shaping the audio
+    let globalTranspose = parseInt(document.getElementById("globalTransposeSlider").value); // in semitones
+    // We'll use the damping slider to set extraSustainTime in SoundManager (default 1.5 seconds)
+    
+    // Conway's Game of Life rule variables
+    let survivalMin = parseInt(document.getElementById("survivalMinSlider").value);
+    let survivalMax = parseInt(document.getElementById("survivalMaxSlider").value);
+    let birthCount  = parseInt(document.getElementById("birthCountSlider").value);
+
+    // Scanning Head variables
+    let scanMode  = document.getElementById("scanModeCheckbox").checked;
+    let scanWidth = parseInt(document.getElementById("scanWidthSlider").value);
+    let scanSpeed = parseInt(document.getElementById("scanSpeedSlider").value);
+    let scanPosition = 0;
+
+    // ----- Voice Definitions & Synth Creation -----
+    const VOICES = [
+      { 
+        name: 'Harmonic', 
+        scale: ['C5', 'D5', 'F5', 'G5', 'A5'], 
+        color: '#a8c6df', 
+        active: true,
+        createSynth: () => new Tone.FMSynth({
+          harmonicity: 3,
+          modulationIndex: 10,
+          oscillator: { type: "sine" },
+          envelope: { attack: 0.01, decay: 0.2, sustain: 0.2, release: 0.8 },
+          modulation: { type: "triangle" },
+          modulationEnvelope: { attack: 0.5, decay: 0.1, sustain: 0.2, release: 0.5 }
+        })
+      },
+      { 
+        name: 'Crystal', 
+        scale: ['C6', 'D6', 'F6', 'G6', 'A6'], 
+        color: '#8eb1d3', 
+        active: true,
+        createSynth: () => new Tone.MetalSynth({
+          frequency: 200,
+          envelope: { attack: 0.001, decay: 0.1, release: 0.2 },
+          harmonicity: 5.1,
+          modulationIndex: 32,
+          resonance: 4000,
+          octaves: 1.5
+        })
+      },
+      { 
+        name: 'Deep', 
+        scale: ['C3', 'D3', 'F3', 'G3', 'A3'], 
+        color: '#749bc7', 
+        active: true,
+        createSynth: () => new Tone.MonoSynth({
+          oscillator: { type: "sine" },
+          envelope: { attack: 0.1, decay: 0.3, sustain: 0.2, release: 0.8 },
+          filter: { Q: 1, type: "lowpass", rolloff: -24 }
+        })
+      },
+      { 
+        name: 'Flow', 
+        scale: ['C4', 'D4', 'F4', 'G4', 'A4'], 
+        color: '#5a85bb', 
+        active: true,
+        createSynth: () => new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: "triangle" },
+          envelope: { attack: 0.02, decay: 0.1, sustain: 0.3, release: 0.9 }
+        })
+      }
+    ];
+
+    // ----- SoundManager: Gain, Limiter & Adaptive Voice Triggering -----
+    class SoundManager {
+      constructor() {
+        this.masterGain = new Tone.Gain(0.1);
+        this.baseVolume = -30;
+        this.voiceGains = {};
+        this.activeVoices = [];
+        this.maxSimultaneousVoices = 10; 
+        // Use damping slider value for extra sustain time:
+        this.extraSustainTime = parseFloat(document.getElementById("dampingSlider").value);
+
+        VOICES.forEach(voice => {
+          this.voiceGains[voice.name] = new Tone.Gain(1);
+        });
+
+        // Effects chain: voice gains -> Master Gain -> Filter -> Delay -> Reverb -> Compressor -> Limiter -> Destination.
+        this.filter = new Tone.Filter({ type: "lowpass", frequency: 2000, rolloff: -12, Q: 1 });
+        this.softDelay = new Tone.FeedbackDelay({ delayTime: "8n", feedback: 0.1, wet: 0.15 });
+        this.reverb = new Tone.Reverb({ decay: 2, preDelay: 0.1, wet: 0.2 });
+        this.compressor = new Tone.Compressor({ threshold: -18, ratio: 3, attack: 0.01, release: 0.1 });
+        this.limiter = new Tone.Limiter(-6);
+
+        Object.values(this.voiceGains).forEach(voiceGain => {
+          voiceGain.connect(this.masterGain);
+        });
+        this.masterGain.connect(this.filter);
+        this.filter.connect(this.softDelay);
+        this.softDelay.connect(this.reverb);
+        this.reverb.connect(this.compressor);
+        this.compressor.connect(this.limiter);
+        this.limiter.toDestination();
+      }
+
+      triggerVoice(voiceName, note, intensity = 1) {
+        if (this.activeVoices.length >= this.maxSimultaneousVoices) {
+          const oldest = this.activeVoices.shift();
+          oldest.synth.dispose();
+        }
+        const voice = VOICES.find(v => v.name === voiceName);
+        if (!voice || !voice.active) return;
+        try {
+          const synth = voice.createSynth();
+          synth.connect(this.voiceGains[voiceName]);
+          const reductionFactor = 5;
+          const reduction = this.activeVoices.length * reductionFactor;
+          synth.volume.value = Math.max(-60, this.baseVolume - reduction);
+          const duration = Math.random() * 0.5 + 1.0;
+          // Apply global transpose if not zero
+          let transposedNote = note;
+          if (globalTranspose !== 0) {
+            transposedNote = Tone.Frequency(note).transpose(globalTranspose).toNote();
+          }
+          synth.triggerAttackRelease(transposedNote, duration);
+          const synthInstance = { voiceName, synth };
+          this.activeVoices.push(synthInstance);
+          setTimeout(() => {
+            this.disposeVoice(synthInstance);
+          }, (duration + this.extraSustainTime) * 1000);
+        } catch (err) {
+          console.error(`Error triggering voice ${voiceName}:`, err);
+        }
+      }
+
+      disposeVoice(synthInstance) {
+        const idx = this.activeVoices.indexOf(synthInstance);
+        if (idx > -1) {
+          this.activeVoices.splice(idx, 1);
+        }
+        synthInstance.synth.dispose();
+      }
+
+      setMasterVolume(volume) {
+        const scaled = Math.pow(volume / 100, 2);
+        this.masterGain.gain.value = scaled;
+      }
+
+      setMaxVoices(max) {
+        this.maxSimultaneousVoices = Math.max(1, Math.min(max, 10));
+      }
+    }
+
+    const soundManager = new SoundManager();
+
+    // ----- Canvas & Video Setup -----
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const gridOverlay = document.getElementById("grid-overlay");
+    const gridCtx = gridOverlay.getContext("2d");
+
+    function resizeCanvases() {
+      const width = Math.max(window.innerWidth, document.documentElement.clientWidth);
+      const height = Math.max(window.innerHeight, document.documentElement.clientHeight);
+      canvas.width = width;
+      canvas.height = height;
+      gridOverlay.width = width;
+      gridOverlay.height = height;
+      drawGrid();
+      console.log("Canvases resized to:", width, "x", height);
+    }
+    window.addEventListener("resize", resizeCanvases);
+    document.addEventListener("DOMContentLoaded", resizeCanvases);
+    video.addEventListener("loadeddata", () => {
+      resizeCanvases();
+      console.log("Video loaded: canvases resized.");
+    });
+    function ensureCanvasSize() {
+      if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+        resizeCanvases();
+      }
+    }
+
+    // ----- Camera Initialization -----
+    let currentStream = null;
+    
+    // Function to list available cameras
+    async function listCameras() {
+      const cameraSelect = document.getElementById('cameraSelect');
+      cameraSelect.innerHTML = '<option value="">Select a camera</option>';
+      
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        
+        if (videoDevices.length === 0) {
+          cameraSelect.innerHTML = '<option value="">No cameras found</option>';
+          return;
+        }
+        
+        videoDevices.forEach((device, index) => {
+          const option = document.createElement('option');
+          option.value = device.deviceId;
+          option.text = device.label || `Camera ${index + 1}`;
+          cameraSelect.appendChild(option);
+        });
+        
+        // Select the first camera by default
+        if (videoDevices.length > 0) {
+          cameraSelect.value = videoDevices[0].deviceId;
+        }
+      } catch (err) {
+        console.error('Error listing cameras:', err);
+        cameraSelect.innerHTML = '<option value="">Camera access denied</option>';
+      }
+    }
+    
+    // Handle camera selection change
+    document.getElementById('cameraSelect').addEventListener('change', function() {
+      const deviceId = this.value;
+      if (deviceId) {
+        initializeCamera(deviceId);
+      }
+    });
+    
+    function initializeCamera(deviceId = null) {
+      // Force initial canvas sizing
+      resizeCanvases();
+      
+      // Stop any existing stream
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+      
+      const constraints = {
+        video: deviceId ? { deviceId: { exact: deviceId } } : { facingMode: "environment" },
+        audio: false
+      };
+      
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia(constraints)
+          .then(stream => {
+            currentStream = stream;
+            video.srcObject = stream;
+            video.play();
+            console.log("Camera feed started.");
+            // Start processing frames once camera is initialized
+            if (!frameProcessingStarted) {
+              requestAnimationFrame(processFrame);
+            }
+            
+            // If this is the first camera initialization, list available cameras
+            if (!deviceId) {
+              listCameras();
+            }
+          })
+          .catch(err => {
+            console.error("Camera error:", err);
+            document.getElementById("message").innerText = "Camera access denied";
+            // Even without camera, start frame processing for debugging
+            if (!frameProcessingStarted) {
+              requestAnimationFrame(processFrame);
+            }
+          });
+      } else {
+        console.error("getUserMedia not supported.");
+        // Fallback - start frame processing anyway
+        if (!frameProcessingStarted) {
+          requestAnimationFrame(processFrame);
+        }
+      }
+    }
+    initializeCamera();
+
+    // ----- Draw Grid Overlay -----
+    function drawGrid() {
+      gridCtx.clearRect(0, 0, gridOverlay.width, gridOverlay.height);
+      gridCtx.strokeStyle = "rgba(168, 198, 223, 0.1)";
+      gridCtx.lineWidth = 1;
+      const width = gridOverlay.width;
+      const height = gridOverlay.height;
+      const cellWidth = width / GRID_SIZE;
+      const cellHeight = height / GRID_SIZE;
+      for (let i = 0; i <= GRID_SIZE; i++) {
+        const xPos = i * cellWidth;
+        gridCtx.beginPath();
+        gridCtx.moveTo(xPos, 0);
+        gridCtx.lineTo(xPos, height);
+        gridCtx.stroke();
+      }
+      for (let j = 0; j <= GRID_SIZE; j++) {
+        const yPos = j * cellHeight;
+        gridCtx.beginPath();
+        gridCtx.moveTo(0, yPos);
+        gridCtx.lineTo(width, yPos);
+        gridCtx.stroke();
+      }
+    }
+
+    // ----- Frame Processing & Tone Triggering -----
+    const offCanvas = document.createElement("canvas");
+    const offCtx = offCanvas.getContext("2d", { willReadFrequently: true });
+    let prevImageData = null;
+    let lastMotionTime = performance.now();
+    function updateAmbientBaseline(currentDiff) {
+      const now = performance.now();
+      if (now - lastMotionTime > 3000) {
+        ambientBaseline = ambientBaseline * 0.9 + currentDiff * 0.1;
+        console.log("Updated ambient baseline:", ambientBaseline);
+      }
+    }
+    function processFrame() {
+      ensureCanvasSize();
+      let tonesScheduledThisFrame = 0;
+      if (video.readyState >= video.HAVE_CURRENT_DATA) {
+        const width = canvas.width;
+        const height = canvas.height;
+        offCanvas.width = width;
+        offCanvas.height = height;
+        offCtx.drawImage(video, 0, 0, width, height);
+        const imageData = offCtx.getImageData(0, 0, width, height);
+        if (prevImageData) {
+          ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+          ctx.fillRect(0, 0, width, height);
+          const cellWidth = width / GRID_SIZE;
+          const cellHeight = height / GRID_SIZE;
+          const sliderValue = parseInt(document.getElementById("sensitivitySlider").value) * sensitivityMultiplier;
+          const noiseFloorValue = parseFloat(document.getElementById("noiseFloorSlider").value);
+          const threshold = noiseFloorValue + sliderValue;
+          const now = performance.now();
+
+          if (document.getElementById("scanModeCheckbox").checked) {
+            scanMode = true;
+            scanPosition = (scanPosition + parseInt(document.getElementById("scanSpeedSlider").value)) % width;
+          } else {
+            scanMode = false;
+          }
+
+          for (let y = 0; y < GRID_SIZE; y++) {
+            for (let x = 0; x < GRID_SIZE; x++) {
+              const cellX = x * cellWidth;
+              const cellY = y * cellHeight;
+              let sumDiff = 0, count = 0;
+              for (let j = 0; j < cellHeight; j++) {
+                for (let i = 0; i < cellWidth; i++) {
+                  const px = Math.floor(cellX + i);
+                  const py = Math.floor(cellY + j);
+                  if (scanMode && (px < scanPosition || px >= scanPosition + parseInt(document.getElementById("scanWidthSlider").value))) {
+                    continue;
+                  }
+                  if (px < width && py < height) {
+                    const index = (py * width + px) * 4;
+                    const rDiff = Math.abs(imageData.data[index] - prevImageData.data[index]);
+                    const gDiff = Math.abs(imageData.data[index + 1] - prevImageData.data[index + 1]);
+                    const bDiff = Math.abs(imageData.data[index + 2] - prevImageData.data[index + 2]);
+                    sumDiff += (rDiff + gDiff + bDiff) / 3;
+                    count++;
+                  }
+                }
+              }
+              const avgDiff = sumDiff / count;
+              updateAmbientBaseline(avgDiff);
+              if (avgDiff > threshold && now - grid[y][x].lastTriggered > CELL_COOLDOWN) {
+                lastMotionTime = now;
+                grid[y][x].lastTriggered = now;
+                grid[y][x].energy = Math.min(maxEnergy, grid[y][x].energy + 0.3);
+                if (isPlaying && tonesScheduledThisFrame < maxTonesPerFrame) {
+                  const activeVoices = VOICES.filter(v => v.active);
+                  if (activeVoices.length > 0) {
+                    const voice = activeVoices[Math.floor(Math.random() * activeVoices.length)];
+                    const note = voice.scale[Math.floor(Math.random() * voice.scale.length)];
+                    soundManager.triggerVoice(voice.name, note);
+                    tonesScheduledThisFrame++;
+                    console.log(`Tone: ${voice.name} ${note}`);
+                  }
+                }
+                ctx.fillStyle = `rgba(168, 198, 223, ${grid[y][x].energy})`;
+                ctx.fillRect(cellX, cellY, cellWidth, cellHeight);
+              } else {
+                grid[y][x].energy = Math.max(0, grid[y][x].energy - 0.01);
+              }
+            }
+          }
+          for (let y = 0; y < GRID_SIZE; y++) {
+            for (let x = 0; x < GRID_SIZE; x++) {
+              const cellX = x * (canvas.width / GRID_SIZE);
+              const cellY = y * (canvas.height / GRID_SIZE);
+              if (grid[y][x].energy > 0) {
+                ctx.fillStyle = `rgba(168, 198, 223, ${grid[y][x].energy})`;
+                ctx.fillRect(cellX, cellY, canvas.width / GRID_SIZE, canvas.height / GRID_SIZE);
+              }
+            }
+          }
+        }
+        prevImageData = imageData;
+      }
+      if (!frameProcessingStarted) {
+        frameProcessingStarted = true;
+        console.log("Frame processing started.");
+      }
+      requestAnimationFrame(processFrame);
+    }
+
+    // ----- User Control Event Listeners -----
+    document.getElementById("playBtn").addEventListener("click", async function() {
+      // Initialize audio context
+      await Tone.start();
+      Tone.context.resume();
+      
+      isPlaying = !isPlaying;
+      this.textContent = isPlaying ? "❚❚ Pause" : "▶ Begin";
+      
+      if (isPlaying) {
+        // Start the evolution interval
+        evolutionInterval = setInterval(evolveGrid, 2000);
+        
+        // Start the zone indicators animation
+        updateZoneIndicators();
+        
+        // Play a startup sound for each active voice
+        VOICES.forEach(voice => {
+          if (voice.active) {
+            const note = voice.scale[Math.floor(Math.random() * voice.scale.length)];
+            soundManager.triggerVoice(voice.name, note, 0.5);
+          }
+        });
+        
+        console.log("Playback started; evolution loop active.");
+      } else {
+        // Stop the evolution interval
+        clearInterval(evolutionInterval);
+        console.log("Playback paused; evolution loop stopped.");
+      }
+    });
+
+    document.getElementById("clearBtn").onclick = () => {
+      grid = grid.map(row => row.map(() => ({ voices: new Set(), energy: 0, lastTriggered: 0 })));
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      console.log("Canvas cleared and grid reset.");
+    };
+
+    document.querySelectorAll(".mute-button").forEach(button => {
+      button.addEventListener('click', function() {
+        button.classList.toggle('active');
+        
+        // Get the voice name from data attribute
+        const voiceName = this.dataset.voice;
+        this.classList.toggle('active');
+        
+        // Find and toggle the corresponding mute button
+        const muteButton = document.querySelector(`.mute-button[data-voice="${voiceName}"]`);
+        if (muteButton) {
+          muteButton.classList.toggle('active');
+          
+          // Update the voice active state
+          const voice = VOICES.find(v => v.name === voiceName);
+          if (voice) {
+            voice.active = this.classList.contains('active');
+            console.log(`${voiceName} is now ${voice.active ? 'active' : 'inactive'}`);
+            
+            // Trigger a test sound when activated
+            if (voice.active && isPlaying) {
+              const note = voice.scale[Math.floor(Math.random() * voice.scale.length)];
+              soundManager.triggerVoice(voice.name, note, 0.7);
+            }
+          }
+        }
+        
+        // Visual feedback - pulse effect
+        const indicator = this.querySelector('.zone-indicator');
+        indicator.style.transform = 'scale(1.3)';
+        setTimeout(() => {
+          indicator.style.transform = this.classList.contains('active') ? 'scale(1.1)' : 'scale(1.0)';
+        }, 300);
+      });
+    });
+
+    // Audio control slider events
+    document.getElementById("masterGainSlider").oninput = (e) => {
+      const volume = parseInt(e.target.value);
+      soundManager.setMasterVolume(volume);
+      console.log("Master gain set to:", volume);
+    };
+    document.getElementById("baseVolumeSlider").oninput = (e) => {
+      soundManager.baseVolume = -parseInt(e.target.value);
+      console.log("Base volume set to:", soundManager.baseVolume, "dB");
+    };
+    // Global Transpose slider event
+    document.getElementById("globalTransposeSlider").oninput = (e) => {
+      globalTranspose = parseInt(e.target.value);
+      console.log("Global Transpose set to:", globalTranspose, "semitones");
+    };
+    // Damping slider event (updates extra sustain time)
+    document.getElementById("dampingSlider").oninput = (e) => {
+      const dampingValue = parseFloat(e.target.value);
+      soundManager.extraSustainTime = dampingValue;
+      console.log("Damping (extra sustain) set to:", dampingValue, "seconds");
+    };
+    document.getElementById("resonanceSlider").oninput = (e) => {
+      const value = parseInt(e.target.value) / 100;
+      soundManager.reverb.decay = 2 + (value * 4);
+      soundManager.softDelay.feedback.value = value * 0.3;
+      soundManager.softDelay.wet.value = value * 0.2;
+      soundManager.filter.frequency.value = 1000 + (value * 2000);
+      console.log("Resonance adjusted:", value);
+    };
+    document.getElementById("timingDelaySlider").oninput = (e) => {
+      timingDelay = parseFloat(e.target.value);
+      console.log("Timing delay set to:", timingDelay);
+    };
+    document.getElementById("noiseFloorSlider").oninput = (e) => {
+      console.log("Noise floor set to:", parseFloat(e.target.value));
+    };
+    document.getElementById("echoSlider").oninput = (e) => {
+      const echoWet = parseInt(e.target.value) / 100;
+      soundManager.softDelay.wet.value = echoWet;
+      console.log("Echo wet set to:", echoWet);
+    };
+    document.getElementById("maxEnergySlider").oninput = (e) => {
+      maxEnergy = parseFloat(e.target.value);
+      console.log("Max energy set to:", maxEnergy);
+    };
+    document.getElementById("maxTonesSlider").oninput = (e) => {
+      maxTonesPerFrame = parseInt(e.target.value);
+      soundManager.setMaxVoices(maxTonesPerFrame);
+      console.log("Max tones per frame set to:", maxTonesPerFrame);
+    };
+
+    // Conway's Game of Life Controls
+    document.getElementById("survivalMinSlider").oninput = (e) => {
+      survivalMin = parseInt(e.target.value);
+      console.log("Survival Min set to:", survivalMin);
+    };
+    document.getElementById("survivalMaxSlider").oninput = (e) => {
+      survivalMax = parseInt(e.target.value);
+      console.log("Survival Max set to:", survivalMax);
+    };
+    document.getElementById("birthCountSlider").oninput = (e) => {
+      birthCount = parseInt(e.target.value);
+      console.log("Birth Count set to:", birthCount);
+    };
+
+    // Scanning Head Controls
+    document.getElementById("scanModeCheckbox").onchange = (e) => {
+      scanMode = e.target.checked;
+      console.log("Scan Mode set to:", scanMode);
+    };
+    document.getElementById("scanWidthSlider").oninput = (e) => {
+      scanWidth = parseInt(e.target.value);
+      console.log("Scan Width set to:", scanWidth);
+    };
+    document.getElementById("scanSpeedSlider").oninput = (e) => {
+      scanSpeed = parseInt(e.target.value);
+      console.log("Scan Speed set to:", scanSpeed);
+    };
+
+    // Cellular Automata Grid Evolution using Conway's rules
+    function evolveGrid() {
+      const newGrid = grid.map(row => row.map(cell => ({
+        voices: new Set(cell.voices),
+        energy: cell.energy,
+        lastTriggered: cell.lastTriggered
+      })));
+      for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+          VOICES.forEach(voice => {
+            if (!voice.active) return;
+            const neighbors = countNeighbors(x, y, voice.name);
+            const isAlive = grid[y][x].voices.has(voice.name);
+            if (isAlive) {
+              if (neighbors < survivalMin || neighbors > survivalMax) {
+                newGrid[y][x].voices.delete(voice.name);
+              }
+            } else if (neighbors === birthCount) {
+              newGrid[y][x].voices.add(voice.name);
+            }
+          });
+        }
+      }
+      grid = newGrid;
+      console.log("Grid evolved at", new Date().toISOString());
+    }
+    function countNeighbors(x, y, voiceName) {
+      let count = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = (x + dx + GRID_SIZE) % GRID_SIZE;
+          const ny = (y + dy + GRID_SIZE) % GRID_SIZE;
+          if (grid[ny][nx].voices.has(voiceName)) count++;
+        }
+      }
+      return count;
+    }
+
+    // UI Interactions: Hamburger & Full Screen
+    const hamburger = document.getElementById("hamburger-menu");
+    const controls = document.getElementById("controls");
+    hamburger.addEventListener("click", () => {
+      controls.classList.toggle("hidden");
+    });
+    
+    // Interactive zones functionality
+    document.querySelectorAll('.zone').forEach(zone => {
+      zone.addEventListener('click', function() {
+        const voiceName = this.getAttribute('data-voice');
+        this.classList.toggle('active');
+        
+        // Find and toggle the corresponding mute button
+        const muteButton = document.querySelector(`.mute-button[data-voice="${voiceName}"]`);
+        if (muteButton) {
+          muteButton.classList.toggle('active');
+          
+          // Update the voice active state
+          const voice = VOICES.find(v => v.name === voiceName);
+          if (voice) {
+            voice.active = this.classList.contains('active');
+            console.log(`${voiceName} is now ${voice.active ? 'active' : 'inactive'}`);
+            
+            // Trigger a test sound when activated
+            if (voice.active && isPlaying) {
+              const note = voice.scale[Math.floor(Math.random() * voice.scale.length)];
+              soundManager.triggerVoice(voice.name, note, 0.7);
+            }
+          }
+        }
+        
+        // Visual feedback - pulse effect
+        const indicator = this.querySelector('.zone-indicator');
+        indicator.style.transform = 'scale(1.3)';
+        setTimeout(() => {
+          indicator.style.transform = this.classList.contains('active') ? 'scale(1.1)' : 'scale(1.0)';
+        }, 300);
+      });
+    });
+    
+    // Update zone indicators based on activity
+    function updateZoneIndicators() {
+      VOICES.forEach(voice => {
+        const zone = document.querySelector(`.zone[data-voice="${voice.name}"]`);
+        if (zone) {
+          const indicator = zone.querySelector('.zone-indicator');
+          if (indicator && voice.active) {
+            // Create a pulsing effect based on recent activity
+            const cell = grid[Math.floor(Math.random() * GRID_SIZE)][Math.floor(Math.random() * GRID_SIZE)];
+            if (cell.energy > 0) {
+              const scale = 1.1 + (cell.energy * 0.3);
+              indicator.style.transform = `scale(${scale})`;
+              indicator.style.opacity = 0.7 + (cell.energy * 0.3);
+              setTimeout(() => {
+                indicator.style.transform = 'scale(1.1)';
+                indicator.style.opacity = '1';
+              }, 300);
+            }
+          }
+        }
+      });
+      
+      // Continue updating
+      if (isPlaying) {
+        setTimeout(updateZoneIndicators, 2000);
+      }
+    }
+    
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    }
+    document.getElementById("fullScreenBtn").addEventListener("click", toggleFullScreen);
+  </script>
+</body>
+</html>
