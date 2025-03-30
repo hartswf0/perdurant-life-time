@@ -497,6 +497,110 @@
       background: rgba(168, 198, 223, 0.5);
       box-shadow: 0 0 15px rgba(168, 198, 223, 0.4) inset;
     }
+    
+    /* Prison Information Panel */
+    .info-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.9);
+      padding: 20px;
+      display: none;
+      z-index: 5;
+      overflow-y: auto;
+    }
+    .prison-content {
+      max-width: 600px;
+      margin: 0 auto;
+      padding-bottom: 60px;
+    }
+    .prison-heading {
+      margin-bottom: 20px;
+      text-align: center;
+      font-size: 24px;
+      color: #a8c6df;
+    }
+    .prison-quote {
+      font-style: italic;
+      text-align: center;
+      margin-bottom: 30px;
+      padding: 0 20px;
+      font-size: 16px;
+      color: #a8c6df;
+    }
+    .prison-tabs {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .prison-tab {
+      background: rgba(20, 30, 40, 0.5);
+      padding: 8px 12px;
+      margin: 5px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #a8c6df;
+      border: 1px solid rgba(168, 198, 223, 0.3);
+    }
+    .prison-tab.active {
+      background: rgba(40, 60, 80, 0.8);
+      border-color: rgba(168, 198, 223, 0.8);
+    }
+    .tab-content {
+      display: none;
+      background: rgba(20, 30, 40, 0.7);
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(168, 198, 223, 0.5);
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .close-info {
+      position: fixed;
+      top: 15px;
+      right: 15px;
+      font-size: 24px;
+      cursor: pointer;
+      color: #a8c6df;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 50%;
+      z-index: 6;
+    }
+    .param-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+      color: #a8c6df;
+    }
+    .param-desc {
+      margin-bottom: 20px;
+      line-height: 1.4;
+    }
+    @media (max-width: 768px) {
+      .info-panel {
+        padding: 10px;
+      }
+      .prison-heading {
+        font-size: 20px;
+      }
+      .prison-quote {
+        font-size: 14px;
+      }
+      .prison-tab {
+        font-size: 12px;
+        padding: 6px 10px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -654,6 +758,135 @@
         <div>Prison</div>
       </div>
     </div>
+  </div>
+
+  <!-- Prison Information Panel -->
+  <div id="prison-info-panel" class="info-panel">
+    <div class="prison-content">
+      <div class="prison-heading">PRISON: Ontological Confinement Patterns</div>
+      <div class="prison-quote">
+        "You may call this space a Dimensional Prison. It does not lock with chains. It locks with assumptions."
+      </div>
+      <div class="prison-tabs">
+        <div class="prison-tab active" data-tab="rules">Rules</div>
+        <div class="prison-tab" data-tab="system">System</div>
+        <div class="prison-tab" data-tab="mapping">Mapping</div>
+      </div>
+      <div class="tab-content active" data-tab-content="rules">
+        <div class="param-title">Birth Rule</div>
+        <div class="param-desc">
+          The Genesis parameter determines when new cells emerge from the void. In standard Conway settings (B3), cells are born when exactly 3 neighbors exist.
+        </div>
+        <div class="param-title">Survival Range</div>
+        <div class="param-desc">
+          The Minimum and Maximum parameters define the survival corridor. Cells persist only when their neighbor count falls within this range.
+        </div>
+        <div class="param-title">Resonance</div>
+        <div class="param-desc">
+          Controls the temporal echo effect when cells vibrate between states. Higher values create more sustain in the sound texture.
+        </div>
+        <div class="param-title">Scanning Rate</div>
+        <div class="param-desc">
+          Determines how quickly the system examines and processes each spacetime configuration. Higher values create more rapid evolution.
+        </div>
+      </div>
+      <div class="tab-content" data-tab-content="system">
+        <div class="param-title">Ontological Implications</div>
+        <div class="param-desc">
+          The Prison metaphor recognizes that cellular automata represent bounded computational reality—systems where emergence is always constrained by their founding axioms.
+        </div>
+        <div class="param-desc">
+          Each evolving pattern becomes a temporal sculpture, trapped within the rules of its reality but free to express itself within those constraints.
+        </div>
+        <div class="param-desc">
+          When computational systems become promptable, interfaces transform into temporal hallucinations and feature sets become probability clouds. This system represents one such ontological hallucination—a reality defined and constrained by its axioms.
+        </div>
+      </div>
+      <div class="tab-content" data-tab-content="mapping">
+        <div class="param-title">How Controls Map to Music Technology</div>
+        <div class="param-desc">
+          <div class="param-title">Membrane (Gain)</div>
+          <div class="param-desc">
+            Controls <span class="code-reference">masterGain.gain.value</span> (line ~1630)<br>
+            Music tech equivalent: Master Volume/Gain<br>
+            Affects the overall loudness of all sounds
+          </div>
+          <div class="param-title">Dimension (Volume)</div>
+          <div class="param-desc">
+            Controls <span class="code-reference">baseVolume</span> (line ~1611)<br>
+            Music tech equivalent: Pre-gain volume level<br>
+            Sets the base volume level before other parameters affect it
+          </div>
+          <div class="param-title">Scaffold (Transpose)</div>
+          <div class="param-desc">
+            Controls <span class="code-reference">globalTranspose</span> (line ~1616)<br>
+            Music tech equivalent: Pitch Transposition<br>
+            Shifts all notes up/down by semitones
+          </div>
+          <div class="param-title">Suspension (Damping)</div>
+          <div class="param-desc">
+            Controls <span class="code-reference">soundManager.extraSustainTime</span> (line ~1622)<br>
+            Music tech equivalent: Release/Decay time<br>
+            Affects how long sounds continue after being triggered
+          </div>
+          <div class="param-title">Threshold (Sensitivity)</div>
+          <div class="param-desc">
+            Controls motion detection sensitivity (line ~1629)<br>
+            Controls how sensitive the system is to visual changes<br>
+            Higher values make the system respond to smaller movements
+          </div>
+          <div class="param-title">Harmony (Resonance)</div>
+          <div class="param-desc">
+            Controls filter resonance (for calculated frequencies)<br>
+            Music tech equivalent: Filter Q/Resonance<br>
+            Makes certain frequencies more pronounced
+          </div>
+          <div class="param-title">Pause (Timing)</div>
+          <div class="param-desc">
+            Controls timing delay between events<br>
+            Music tech equivalent: Sequencer timing<br>
+            Affects how quickly the system responds to triggers
+          </div>
+          <div class="param-title">Fracture (Noise)</div>
+          <div class="param-desc">
+            Controls noise floor/randomness (line ~1642)<br>
+            Music tech equivalent: Noise generator or randomization<br>
+            Adds unpredictability to the sound generation
+          </div>
+          <div class="param-title">Bridge (Echo)</div>
+          <div class="param-desc">
+            Controls echo/delay effect level<br>
+            Music tech equivalent: Delay/Echo effect<br>
+            Creates spatial depth through time-delayed repetitions
+          </div>
+          <div class="param-title">Voices (MaxTones)</div>
+          <div class="param-desc">
+            Controls <span class="code-reference">soundManager.maxSimultaneousVoices</span> (line ~1651)<br>
+            Music tech equivalent: Polyphony<br>
+            Determines how many notes can sound simultaneously
+          </div>
+          <div class="param-title">Force (Energy)</div>
+          <div class="param-desc">
+            Controls the maximum energy level<br>
+            Music tech equivalent: Dynamics/Velocity<br>
+            Affects the intensity of triggered sounds
+          </div>
+          <div class="param-title">Field (ScanSet)</div>
+          <div class="param-desc">
+            Controls scanning parameters for visual input<br>
+            Controls "WIDTH" (scan width) and "VELOCITY" (scan speed)<br>
+            Determines how the camera input is processed for sound triggering
+          </div>
+          <div class="param-title">Minimum/Maximum/Genesis</div>
+          <div class="param-desc">
+            Control Conway's Game of Life parameters<br>
+            Music tech equivalent: Generative sequencer rules<br>
+            Determine how cellular patterns evolve and trigger sounds
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="close-info">×</div>
   </div>
 
   <script>
@@ -886,6 +1119,10 @@
                   makeSliderInteractive(sliderDef, originalSlider);
                 }
               }
+            } else {
+              // Show the Prison information panel
+              const prisonInfoPanel = document.getElementById('prison-info-panel');
+              prisonInfoPanel.style.display = 'flex';
             }
           }
         });
@@ -1850,6 +2087,38 @@
       }
     }
     document.getElementById("fullScreenBtn").addEventListener("click", toggleFullScreen);
+    
+    // Close Prison information panel
+    document.querySelector('.close-info').addEventListener('click', function() {
+      const prisonInfoPanel = document.getElementById('prison-info-panel');
+      prisonInfoPanel.style.display = 'none';
+    });
+    
+    // Tab switching for Prison information panel
+    document.querySelectorAll('.prison-tab').forEach(tab => {
+      tab.addEventListener('click', function() {
+        const tabId = this.getAttribute('data-tab');
+        const tabContent = document.querySelector(`.tab-content[data-tab-content="${tabId}"]`);
+        
+        // Remove active class from all tabs
+        document.querySelectorAll('.prison-tab').forEach(t => {
+          t.classList.remove('active');
+        });
+        
+        // Add active class to clicked tab
+        this.classList.add('active');
+        
+        // Hide all tab contents
+        document.querySelectorAll('.tab-content').forEach(content => {
+          content.classList.remove('active');
+        });
+        
+        // Show the selected tab content
+        if (tabContent) {
+          tabContent.classList.add('active');
+        }
+      });
+    });
   </script>
 </body>
 </html>
